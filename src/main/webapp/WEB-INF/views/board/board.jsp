@@ -42,22 +42,19 @@ $('#writeBoardArticle').on('click', function(){
 </script>
 </head>
 <body>
-  <div class="container px-0 mx-0">
+<div>
+  <div class="px-0">
   	<div class="row justify-content-end  pr-3">
   	  <button id="writeBoardArticle" class="btn btn-primary mb-3 px-4">글쓰기</button>
   	</div>
-	<div class="row">
-	  <div class="col">
-	    <div id="board_grid"></div>
-	  </div>				
-	</div>
+	  <div id="board_grid"></div>
 	<div class="row justify-content-center mt-3">
 	  <div class="col">
 	    <div id="pagination"></div>
 	  </div>
 	</div>
   </div>
-  
+</div>  
 <script>
 $(document).ready(function(){
 	util.requestSync("/board/list", boardParam, "GET", gridResetData);
