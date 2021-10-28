@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="board">
+	<select id="getBoardList" parameterType="hashmap" resultType="hashmap">    
+        SELECT NO
+  	 	     , TITLE
+  	 	     , REG_ID
+  	 	     , REG_DATE
+  	 	     , CNT 
+  	 	  FROM (
+  	 			SELECT *
+  	 	  		FROM (
+							SELECT ROWNUM AS NUM
+							     , NO
+		     					 , TITLE
+     					 		 , REG_ID
+     					 		 , TO_CHAR(
+     					 		 			FROM_TZ(cast(REG_DATE AS timestamp), 'UTC') AT time ZONE 'Asia/SEOUL'
+     					 		 			, 'YYYY-MM-DD HH24:MI:SS') AS REG_DATE 
+     				 			 , CNT
+  			  				  FROM BOARD b
+		 			 		 WHERE 1 = 1
+   				   		       AND DEL = #{DEL}
+   				   		   <if test='GROUP_ID != "ALL"'>
+   		                       AND GROUP_ID = #{GROUP_ID}      
+   		                   </if>
+      	 		     	  ORDER BY NO ASC
+      	 		      ) A
+      	 		WHERE A.NUM &lt;= #{FIRST_NUMBER}
+      		 ORDER BY A.NUM DESC
+      		  ) AA
+		 WHERE AA.NUM &gt; #{LAST_NUMBER}
+	</select>
+
+	<select id="getTotalRowSize" parameterType="hashmap" resultType="int">
+	  SELECT *
+		  FROM (
+				SELECT ROWNUM
+		  		  FROM BOARD b
+		 		 WHERE 1 = 1
+		 	<if test='DEL != null'>
+		 		   AND DEL = #{DEL}
+		 	</if>
+		 	<if test='GROUP_ID != "ALL"'>
+   		               AND GROUP_ID = #{GROUP_ID}      
+      		</if> 
+	  		  ORDER BY ROWNUM DESC
+	           ) A
+		 WHERE ROWNUM  = 1
+	</select>
+	
+	<insert id="insertBoardItem" parameterType="hashmap">
+		INSERT INTO BOARD( NO
+		, SEQ
+		, GROUP_ID
+		, TITLE
+		, CONTENTS
+		, NOTICE
+		, CNT
+		, DEL
+		, REG_ID
+		, REG_DATE
+	<if test="GROUP_KEY != null">
+		, GROUP_KEY
+	</if>
+		)
+		VALUES ( #{NO}
+		, #{SEQ}
+		, #{GROUP_ID}
+		, #{TITLE}
+		, #{CONTENTS}
+		, #{NOTICE}
+		, #{CNT}
+		, #{DEL}
+		, #{REG_ID}
+		, SYSDATE
+	<if test="GROUP_KEY != null">
+		, #{GROUP_KEY}
+	</if>
+		)
+	</insert>
+	
+	<select id="getDataByNO" parameterType="hashmap" resultType="hashmap">
+		SELECT b.* 
+		     , mc.CDNM  
+  		  FROM BOARD b
+  		     , MCO_CODE mc 
+  		 WHERE 1 = 1
+  		   AND NO = #{NO}
+  		   AND b.GROUP_ID = mc.CD 
+	</select>
+	
+	<select id="selectFileGroupKey" parameterType="hashmap" resultType="string">
+		SELECT SYS_GUID() FROM DUAL
+	</select>
+</mapper>

@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="webHard">
+
+	<!-- 해당 EMAIL을 가진 가장 최상위 폴더의 DIR_NO를 구한다. -->
+	<select id="getRootDirInfo" parameterType="hashmap" resultType="hashmap">
+		SELECT DIR_NO 
+			 , PDIR_NO
+			 , DIR_REALNAME
+			 , EMAIL
+		  FROM WEBHARD_DIR wd
+		 WHERE 1 = 1
+		   AND PDIR_NO = 0
+		   AND EMAIL = #{EMAIL}
+	</select>
+	
+	<select id="getFileListByDIR_REALNAME" parameterType="hashmap" resultType="hashmap">
+		SELECT NVL(DIR_REALNAME, '/') AS FILENAME
+		     , TO_CHAR(
+     					FROM_TZ(cast(CHG_DATE AS timestamp), 'UTC') AT time ZONE 'Asia/SEOUL'
+     					, 'YYYY-MM-DD HH24:MI:SS') AS MODIFYDATE 
+		     , 'Folder' AS TYPE
+		     , '' AS CAPACITY 
+		     , DIR_NO 
+		     , PDIR_NO
+		  FROM WEBHARD_DIR wd
+		 WHERE 1 = 1
+		   AND EMAIL = #{EMAIL}
+		   AND LEVEL = 1
+		   AND DEL_YN = 'N'
+		 START WITH wd.PDIR_NO = (
+		 							SELECT DIR_NO 
+		  							  FROM WEBHARD_DIR
+		 							 WHERE 1 = 1
+		 							   AND DEL_YN = 'N'
+		 							   AND EMAIL = #{EMAIL} 
+		 						<choose>
+		 						  <when test="DIR_REALNAME != null and !DIR_REALNAME.equals('')">
+		   							   AND DIR_REALNAME = #{DIR_REALNAME}		 						  
+		 						  </when>
+		 						  <otherwise>
+		 						  	   AND DIR_REALNAME IS NULL
+		 						  </otherwise>
+		 						</choose>
+		 						 )
+		CONNECT BY PRIOR wd.DIR_NO = wd.PDIR_NO
+		
+		UNION ALL
+		
+		SELECT FILE_REALNAME AS FILENAME
+			 , TO_CHAR(
+     					FROM_TZ(cast(CHG_DATE AS timestamp), 'UTC') AT time ZONE 'Asia/SEOUL'
+     					, 'YYYY-MM-DD HH24:MI:SS') AS MODIFYDATE 
+		     , 'File' AS TYPE
+		     , CONCAT(TO_CHAR(FILE_LENGTH/1024, '999,999,999,999,999'), 'KB') AS CAPACITY
+		     , DIR_NO 
+		     , (
+				  SELECT PDIR_NO
+				    FROM WEBHARD_DIR
+				   WHERE 1 = 1 
+				     AND DIR_NO = #{DIR_NO}
+			   )
+		  FROM WEBHARD_FILE_GRP wfg 
+		 WHERE 1 = 1
+		   AND EMAIL = #{EMAIL}
+		   AND DEL_YN = 'N'
+		   AND DIR_NO = #{DIR_NO}
+		   
+		 ORDER BY TYPE DESC, FILENAME ASC   
+	</select>
+	
+	<select id="getUpDirInfo" parameterType="hashmap" resultType="hashmap">
+		SELECT DIR_NO 
+			 , PDIR_NO 
+			 , NVL(DIR_REALNAME, '') AS DIR_REALNAME
+			 , EMAIL
+		  FROM WEBHARD_DIR wd 
+		 WHERE 1 = 1
+		   AND EMAIL = #{EMAIL}
+		   AND LEVEL = 2
+		 START WITH wd.DIR_NO = #{DIR_NO}
+		CONNECT BY PRIOR wd.PDIR_NO = wd.DIR_NO
+	</select>
+	
+	<insert id="createDirectory" parameterType="hashmap">
+		INSERT INTO WEBHARD_DIR ( DIR_NO
+								, PDIR_NO
+								, DIR_REALNAME
+								, DEL_YN
+								, EMAIL
+								, REG_DATE
+								, CHG_DATE )
+						 VALUES ( #{DIR_NO}
+							   	, #{PDIR_NO}
+							   	, #{DIR_REALNAME}
+							   	, 'N'
+							   	, #{EMAIL}
+							   	, SYSDATE
+							   	, SYSDATE )
+	</insert>
+	
+	<update id="deleteDir" parameterType="hashmap">
+		UPDATE WEBHARD_DIR
+		   SET DEL_YN = 'Y'
+		 WHERE 1 = 1
+		   AND DIR_NO  = (
+							SELECT DIR_NO 
+							  FROM WEBHARD_DIR wd 
+							 WHERE 1 = 1
+							   AND EMAIL = #{EMAIL}
+							   AND DEL_YN = 'N'
+							   AND DIR_REALNAME = #{NAME}
+						 )
+	</update>
+	
+	<update id="deleteFile" parameterType="hashmap">
+		UPDATE WEBHARD_FILE_GRP
+		   SET DEL_YN = 'Y'
+		 WHERE 1 = 1
+		   AND EMAIL = #{EMAIL}
+		   AND DIR_NO = #{DIR_NO}
+		   AND FILE_REALNAME  = #{NAME}
+		   
+	</update>
+	
+	<select id="getInfoForFile" parameterType="hashmap" resultType="hashmap">
+		SELECT SYS_GUID() AS GUID
+			 , TO_CHAR(SYSDATE, 'YYYY-MM-DD') AS CURRENT_DATE 
+		  FROM DUAL
+	</select>
+	
+	<select id="fileInfoByFILE_REALNAME" parameterType="hashmap" resultType="hashmap">
+		SELECT *
+		  FROM WEBHARD_FILE_GRP wfg 
+		 WHERE 1 = 1
+		   AND EMAIL = #{EMAIL}
+		   AND DEL_YN = 'N'
+		   AND DIR_NO = #{DIR_NO}
+		   AND FILE_REALNAME = #{FILE_REALNAME}
+	</select>
+	
+	<insert id="insertFile">
+		INSERT INTO WEBHARD_FILE_GRP ( GROUP_KEY
+									, FILE_SEQ
+									, FILE_PATH
+									, DIR_NO
+									, FILE_REALNAME
+									, FILE_NAME
+									, FILE_LENGTH
+									, DEL_YN
+									, EMAIL
+									, REG_DATE
+									, CHG_DATE )
+							 VALUES ( #{GROUP_KEY}
+									, #{FILE_SEQ}
+									, #{FILE_PATH}
+									, #{DIR_NO}
+									, #{FILE_REALNAME}
+									, #{FILE_NAME}
+									, #{FILE_LENGTH}
+									, 'N'
+									, #{EMAIL}
+									, SYSDATE
+									, SYSDATE )
+	</insert>
+	
+</mapper>

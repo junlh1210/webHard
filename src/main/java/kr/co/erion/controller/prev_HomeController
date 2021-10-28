@@ -1,0 +1,277 @@
+package kr.co.erion.controller;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.net.URLDecoder;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.io.FileUtils;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.util.FileCopyUtils;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
+import org.springframework.web.servlet.ModelAndView;
+
+import kr.co.erion.Utils.FindPathAndName;
+import kr.co.erion.Utils.WithFileSeparator;
+import kr.co.erion.domain.FileData;
+import kr.co.erion.domain.Variables;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Controller
+public class HomeController {
+	
+	/**
+	 * 
+	 * @param model
+	 * @return String
+	 */
+	@RequestMapping(value = "/", method = RequestMethod.GET)
+	public String index(Model model) {
+		log.info("http://localhost:8080으로 접속했습니다.");
+		
+		model.addAttribute("ServerInfo", System.getProperty("spring.profiles.active"));
+		
+		return "auth/loginForm";
+	}
+	
+	@RequestMapping(value = "/webhard", method = RequestMethod.GET)
+	public String webHard(Model model) {
+		log.info("http://localhost:8080/webHard로 접속했습니다.");
+		
+		return "webhard2";
+	}
+	
+	/**
+	 * @param request
+	 * @return List<FileData>
+	 * @throws Exception
+	 */
+	@ResponseBody
+	@GetMapping("/webhard/**/list")
+	public List<FileData> subDir1(Model model, HttpServletRequest request) {
+		String dir = null;
+		List<FileData> fileList = null;
+		
+		try {
+			String total_uri =  URLDecoder.decode(request.getRequestURI(), "utf-8");
+			String wanted_uri = WithFileSeparator.removeLastStr(total_uri);
+			log.info("total_uri: " + total_uri);
+			log.info("wanted_uri: " + wanted_uri);
+			
+			// 운영체제를 구분하여 위치를 달리한다.
+			if (System.getProperty("os.name").toLowerCase().indexOf("win") >= 0) {
+				dir = Variables.WIN_LOCAL_HDD_ROOT.getStorage() + File.separator + wanted_uri;
+			} else {
+				dir = Variables.LINUX_LOCAL_HDD_ROOT.getStorage() + File.separator + wanted_uri;
+			}
+			
+			fileList = fileList(dir);
+			fileList.add(0, new FileData(".", null, "Folder", null));
+			fileList.add(1, new FileData("..", null, "Folder", null));
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return fileList;
+	}
+	
+	/**
+	 * 
+	 * @param dir
+	 * @return List<FileData>
+	 * @throws IOException
+	 */
+	private List<FileData> fileList(String dir) throws IOException {
+		return Files.list(
+				Paths.get(dir))
+				     .map(Path::toFile)
+				     .map(FileData::new)
+				     .sorted(
+				    		 Comparator.comparing(FileData::getType)
+				    		           .reversed()
+				    		           .thenComparing(FileData::getFileName))
+				     .collect(Collectors.toList());
+	}
+
+	/**
+	 * 
+	 * @param map
+	 * @return ModelAndView
+	 * @throws Exception
+	 */
+	@RequestMapping("webhard/**/getFileDownload")
+	public ModelAndView getFileDownload(@RequestParam Map<String, String> map, HttpServletRequest request) throws Exception {
+		
+		String total_uri =  URLDecoder.decode(request.getRequestURI(), "utf-8");
+		String wanted_uri = WithFileSeparator.removeLastStr(total_uri);
+		log.info("wanted_uri: " + wanted_uri);
+		
+		String path = null;
+		
+		// 운영체제를 구분하여 위치를 달리한다.
+		if (System.getProperty("os.name").toLowerCase().indexOf("win") >= 0) {
+			path = Variables.WIN_LOCAL_HDD_ROOT.getStorage();
+		} else {
+			path = Variables.LINUX_LOCAL_HDD_ROOT.getStorage();
+		}
+		
+		if (wanted_uri.equals("")) {
+			path += File.separator + map.get("FILE_NAME");
+		} else {
+			path += File.separator + wanted_uri + File.separator + map.get("FILE_NAME");
+		}
+		
+		log.info("파일 " + path + "을 다운로드 합니다.");
+		
+		File downloadFile = new File(path);
+		Map<String, File> data = new HashMap<>();
+		data.put("model", downloadFile);
+		return new ModelAndView("downloadView", "downloadFile", data);
+	}
+	
+	
+	@ResponseBody
+	@PostMapping("webhard/**/upload")
+	public Map<String, List<String>> upload(Model model, MultipartHttpServletRequest req, HttpServletResponse res) {
+		
+		List<MultipartFile> files = req.getFiles("files");
+		List<String> result = new ArrayList<>();
+		Map<String, List<String>> map = new HashMap<>();
+
+		for (int i = 0; i < files.size(); i++) {
+			MultipartFile mpf = files.get(i);
+			result.add(mpf.getOriginalFilename());
+			String sPath = "";
+
+			try {
+				// 운영체제를 구분하여 위치를 달리한다.
+				if (System.getProperty("os.name").toLowerCase().indexOf("win") >= 0) {
+					sPath = "c:" + File.separator + "NAS" + File.separator;
+				} else {
+					sPath = "data" + File.separator + "Upload" + File.separator;
+				}
+				
+
+				// 1. 지정된 위치가 존재하는지 확인하고 없으면 경로를 생성한다.
+				File chkDir = new File(sPath);
+				if (!chkDir.isDirectory()) {
+					chkDir.mkdirs();
+				}
+
+				// 2. 지정된 위치에 파일을 복사한다.
+				if (Files.exists(Paths.get(sPath + mpf.getOriginalFilename()))) {
+					throw new Exception("동일한 파일이 존제합니다.");
+				} else {
+					FileCopyUtils.copy(mpf.getBytes(), new FileOutputStream(sPath + mpf.getOriginalFilename()));
+				}
+				
+			} catch (Exception e) {
+				System.out.println("error - " + e.getMessage());
+				e.printStackTrace();
+			}
+
+			map.put("files", result);
+		}
+		return map;
+	}
+
+	
+	@ResponseBody
+	@GetMapping("/webhard/**/createFolder")
+	public List<FileData> createFolder(HttpServletRequest request) {
+		String dir = null;
+		List<FileData> fileList = null;
+		
+		try {
+			String total_uri =  URLDecoder.decode(request.getRequestURI(), "utf-8");
+			log.info("total_uri: " + total_uri);
+			
+			String wanted_uri = WithFileSeparator.removeLastStr(total_uri);
+			log.info("wanted_uri: " + wanted_uri);
+			
+			
+			// 운영체제를 구분하여 위치를 달리한다.
+			if (System.getProperty("os.name").toLowerCase().indexOf("win") >= 0) {
+				dir = Variables.WIN_LOCAL_HDD_ROOT.getStorage() + File.separator + wanted_uri;
+			} else {
+				dir = Variables.LINUX_LOCAL_HDD_ROOT.getStorage() + File.separator + wanted_uri;
+			}
+			
+			
+			// 경로를 이용하여 폴더 생성
+			Files.createDirectories(Paths.get(dir));
+			
+			// 생성 폴더의 부모 폴더를 알아낸다.
+			dir = Paths.get(dir).getParent().toString();
+			
+			fileList = fileList(dir);
+			fileList.add(0, new FileData(".", null, "Folder", null));
+			fileList.add(1, new FileData("..", null, "Folder", null));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return fileList;
+	}
+	
+	
+	@ResponseBody
+	@DeleteMapping({"/webhard/**/file", "/webhard/**/folder"})
+	public List<FileData> delete(HttpServletRequest request) {
+		
+		String dir = null;
+		List<FileData> fileList = null;
+		
+		try {
+			String total_uri =  URLDecoder.decode(request.getRequestURI(), "utf-8");
+			
+			Map<String, String> map = FindPathAndName.find(total_uri);
+
+			// 마자막에 File.separator를 붙여준다.
+			// 운영체제를 구분하여 위치를 달리한다.
+			if (System.getProperty("os.name").toLowerCase().indexOf("win") >= 0) {
+				dir = Variables.WIN_LOCAL_HDD_ROOT.getStorage()  + File.separator + map.get("path") + File.separator;
+			} else {
+				dir = Variables.LINUX_LOCAL_HDD_ROOT.getStorage()  + File.separator + map.get("path") + File.separator;
+			}
+			
+			// 폴더라면 FileUtils를 이용하여 한번에 삭제, 파일이라면 그 파일만 삭제한다.
+			if (map.get("kind").equals("folder")) {
+				FileUtils.deleteDirectory(Paths.get(dir + map.get("name")).toFile());
+			} else {
+				Files.delete(Paths.get(dir + map.get("name")));
+			}
+			
+			fileList = fileList(dir);
+			fileList.add(0, new FileData(".", null, "Folder", null));
+			fileList.add(1, new FileData("..", null, "Folder", null));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return fileList;
+	}
+}

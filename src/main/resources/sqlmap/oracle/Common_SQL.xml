@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="common">
+	<select id="selectItems" parameterType="hashmap" resultType="hashmap">
+		SELECT CD   AS CODE
+		     , CDNM AS VALUE
+		  FROM CODE A
+		 WHERE A.UPCD = #{upcd}
+	</select>
+	
+	<select id="getMaxRow" parameterType="hashmap" resultType="int">
+	  SELECT *
+		  FROM (
+				SELECT ROWNUM
+		  		  FROM ${TABLE_NAME}
+		 		 WHERE 1 = 1
+	  		  ORDER BY ROWNUM DESC
+	           ) A
+		 WHERE ROWNUM  = 1
+	</select>
+	
+</mapper>
+	

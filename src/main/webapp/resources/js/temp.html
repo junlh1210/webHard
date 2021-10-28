@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOM 다루기</title>
+</head>
+<body>
+    <div id="wrapper">
+        <ul id="accordionSidebar">
+            <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/">
+                <div class="sidebar-brand-icon">
+                  <img src="/resources/img/erion.png" alt="avatar image" srcset="" style="width: 32px" />
+                </div>
+                <div class="sidebar-brand-text mx-3 userName">유저닉네임으로 교체</div>
+              </a>
+      
+              <!-- Divider -->
+              <hr class="sidebar-divider my-0" />
+      
+              <!-- Nav Item - Dashboard -->
+              <li class="nav-item active">
+                <a class="nav-link" href="#">
+                  <i class="fas fa-clipboard-list"></i>
+                  <span>환경은 ${sessionScope.ServerInfo}</span>
+                </a>
+              </li>
+        </ul>
+    </div>
+<script>
+    const makeMenuArray = results => {
+        const menuArray = [];
+        let temp = [];
+        for(let i = 0; i < results.length; i++) {
+            if (results[i].LEVEL == 1 && temp.length != 0) {
+                menuArray.push(temp);
+                temp = [];
+            }
+            temp.push(results[i]);
+        }
+        menuArray.push(temp);
+
+        return menuArray;
+    };
+
+    const makeMenu = menuArray => {
+        let liStart = `
+        <hr class="sidebar-divider my-0" />
+    
+        <li class="nav-item">
+          <a
+            class="nav-link collapsed"
+            href="#"
+            data-toggle="collapse"
+            data-target="#${menuArray[0].PATH.substring(1)}"
+            aria-expanded="true"
+            aria-controls="${menuArray[0].PATH.substring(1)}"
+          >
+            ${menuArray[0].ICON_NM}
+            <span>${menuArray[0].MENU_NM}</span>
+          </a>
+          <div id="${menuArray[0].PATH.substring(1)}" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionSidebar">
+            <div class="bg-white py-2 collapse-inner rounded">
+        `;
+
+        for(let i=1 ; i < menuArray.length; i++) {
+		    liStart += `
+		      <a class="collapse-item">
+                <span
+                  onClick="javascript:showLoad('${menuArray[i].MENU_NM}', '${menuArray[i].PATH.startsWith('/board')  ? menuArray[i].PATH + '/1' :  menuArray[i].PATH}');"
+                  style="cursor: pointer; cursor: hand"
+                >
+                    ${menuArray[i].ICON_NM}&nbsp;&nbsp;${menuArray[i].MENU_NM}
+                </span>
+              </a>
+		    `;
+	}
+
+        let liEnd = `
+            </div>
+          </div>
+        </li>
+        `;
+
+        return liStart + liEnd;
+    };
+
+    const results = [
+        {LEVEL: 1, PATH: '/board', MENU_NM: '게시판'},
+        {LEVEL: 2, PATH: '/board/all', MENU_NM: '전체게시판'},
+        {LEVEL: 2, PATH: '/board/notice', MENU_NM: '공지사항'},
+        {LEVEL: 2, PATH: '/board/free', MENU_NM: '자유게시판'},
+        {LEVEL: 2, PATH: '/board/qna', MENU_NM: 'Q&A게시판'},
+        {LEVEL: 1, PATH: '/util', MENU_NM: 'Utilities'},
+        {LEVEL: 2, PATH: '/util/webHard', MENU_NM: '웹하드'},
+        {LEVEL: 2, PATH: '/util/crawling', MENU_NM: '크롤링'},
+        {LEVEL: 1, PATH: '/lecture', MENU_NM: '동영상 강의'},
+        {LEVEL: 2, PATH: '/util/realJava', MENU_NM: '빵형의 실전Java'},
+        {LEVEL: 2, PATH: '/util/javascriptByElli', MENU_NM: '자바스크립트 by 엘리'}
+    ];
+
+    const menuArray = makeMenuArray(results);
+    const ul = document.querySelector('ul#accordionSidebar');
+    menuArray.forEach(i => {
+        ul.insertAdjacentHTML('beforeend', makeMenu(i));
+    });
+
+</script>
+</body>
+</html>
