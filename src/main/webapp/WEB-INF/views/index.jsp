@@ -412,9 +412,10 @@
 
           <!-- Footer -->
           <footer class="sticky-footer bg-white">
-            <div class="container my-auto">
-              <div class="copyright text-center my-auto">
-                <span>Copyright &copy; 빨리어서와 2021</span>
+            <div class="container my-auto" style="max-width: 100%">
+              <div class="row copyright my-auto">
+                <span class="col-6">Copyright &copy; 빨리어서와 2021</span>
+              	<a class="col-6 text-right pr-3" href="https://github.com/junlh1210/webHard" target="_blank">https://github.com/junlh1210/webHard</a>
               </div>
             </div>
           </footer>
